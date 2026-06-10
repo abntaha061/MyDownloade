@@ -105,10 +105,12 @@ fun BrowserScreen(
                         modifier = Modifier
                             .weight(1f)
                             .height(52.dp),
-                        placeholder = { Text("Search or enter web address") },
+                        placeholder = { Text("Search or enter web address", style = MaterialTheme.typography.bodyMedium) },
                         singleLine = true,
                         colors = TextFieldDefaults.colors(
-                            focusedIndicatorColor = Color.Transparent,
+                            focusedContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f),
+                            unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f),
+                            focusedIndicatorColor = MaterialTheme.colorScheme.primary,
                             unfocusedIndicatorColor = Color.Transparent
                         ),
                         shape = RoundedCornerShape(26.dp),

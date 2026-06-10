@@ -13,6 +13,8 @@ import com.example.data.model.DownloadStatus
 import com.example.data.repository.DownloadRepository
 import com.example.di.AppModule
 import kotlinx.coroutines.*
+import kotlinx.coroutines.sync.*
+import java.util.concurrent.atomic.AtomicInteger
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import java.io.File
@@ -165,6 +167,7 @@ class DownloadWorker(
             val downloadedBytes = AtomicLong(initialBytes)
             val startTime = System.currentTimeMillis()
             val lastUpdate = AtomicLong(System.currentTimeMillis())
+            val lastSpeedBytes = AtomicLong(initialBytes)
 
             coroutineScope {
                 for (i in 0 until concurrentChunks) {
@@ -212,8 +215,9 @@ class DownloadWorker(
                                                 val lastVal = lastUpdate.get()
                                                 if (now - lastVal > 700) {
                                                     if (lastUpdate.compareAndSet(lastVal, now)) {
-                                                        val elapsedSec = (now - startTime) / 1000.0
-                                                        val speedBps = if (elapsedSec > 0) (currentlyDownloaded - initialBytes) / elapsedSec else 0.0
+                                                        val prevBytes = lastSpeedBytes.getAndSet(currentlyDownloaded)
+                                                        val durationSec = (now - lastVal) / 1000.0
+                                                        val speedBps = if (durationSec > 0) (currentlyDownloaded - prevBytes) / durationSec else 0.0
                                                         val progress = currentlyDownloaded.toFloat() / totalBytes
                                                         
                                                         val speedStr = formatSpeed(speedBps)
@@ -345,7 +349,7 @@ class DownloadWorker(
 
         val baseUrl = m3u8Url.substringBeforeLast("/")
         val startTime = System.currentTimeMillis()
-        var lastUpdate = System.currentTimeMillis()
+        val lastUpdate = java.util.concurrent.atomic.AtomicLong(System.currentTimeMillis())
 
         // Calculate size of already downloaded fragments
         val segmentFiles = List(totalSegments) { index ->
@@ -359,68 +363,104 @@ class DownloadWorker(
             }
         }
 
-        var totalBytesDownloaded = previouslyDownloadedBytes
+        val completedSegments = java.util.concurrent.atomic.AtomicInteger(0)
+        val completedSegmentCount = segmentFiles.count { it.exists() && it.length() > 0 }
+        completedSegments.set(completedSegmentCount)
 
-        for (index in 0 until totalSegments) {
-            if (isStopped) throw CancellationException("HLS session paused")
+        val totalBytesDownloaded = java.util.concurrent.atomic.AtomicLong(previouslyDownloadedBytes)
+        val lastSpeedBytes = java.util.concurrent.atomic.AtomicLong(previouslyDownloadedBytes)
 
-            val segmentFile = segmentFiles[index]
-            var segmentUrl = segments[index]
-            if (!segmentUrl.startsWith("http://") && !segmentUrl.startsWith("https://")) {
-                segmentUrl = "$baseUrl/$segmentUrl"
-            }
+        // Parallel HLS segment downloading with concurrency limit of 5
+        val semaphore = Semaphore(5)
 
-            // Skip if this specific segment is already fully downloaded
-            if (!segmentFile.exists() || segmentFile.length() == 0L) {
-                var success = false
-                var tryCount = 0
-                while (tryCount < 3 && !success && !isStopped) {
-                    try {
-                        tryCount++
-                        val segRequest = createRequestBuilder(segmentUrl).build()
-                        client.newCall(segRequest).execute().use { response ->
-                            if (response.isSuccessful) {
-                                val body = response.body ?: throw Exception("Null TS chunk")
-                                val stream = body.byteStream()
-                                
-                                segmentFile.outputStream().use { fos ->
-                                    val buffer = ByteArray(65536)
-                                    var bytesRead: Int
-                                    while (stream.read(buffer).also { bytesRead = it } != -1) {
-                                        fos.write(buffer, 0, bytesRead)
-                                        totalBytesDownloaded += bytesRead
+        coroutineScope {
+            val jobs = List(totalSegments) { index ->
+                async(Dispatchers.IO) {
+                    if (isStopped) return@async false
+
+                    val segmentFile = segmentFiles[index]
+                    var segmentUrl = segments[index]
+                    if (!segmentUrl.startsWith("http://") && !segmentUrl.startsWith("https://")) {
+                        segmentUrl = "$baseUrl/$segmentUrl"
+                    }
+
+                    // Skip if this specific segment is already fully downloaded
+                    if (segmentFile.exists() && segmentFile.length() > 0L) {
+                        return@async true
+                    }
+
+                    var success = false
+                    semaphore.withPermit {
+                        var tryCount = 0
+                        while (tryCount < 3 && !success && !isStopped) {
+                            try {
+                                tryCount++
+                                val segRequest = createRequestBuilder(segmentUrl).build()
+                                client.newCall(segRequest).execute().use { response ->
+                                    if (response.isSuccessful) {
+                                        val body = response.body ?: throw Exception("Null TS chunk")
+                                        val stream = body.byteStream()
+                                        
+                                        segmentFile.outputStream().use { fos ->
+                                            val buffer = ByteArray(65536)
+                                            var bytesRead: Int
+                                            while (stream.read(buffer).also { bytesRead = it } != -1) {
+                                                if (isStopped) throw CancellationException("HLS session paused")
+                                                fos.write(buffer, 0, bytesRead)
+                                                val currentBytes = totalBytesDownloaded.addAndGet(bytesRead.toLong())
+                                                
+                                                // Throttle progress updates to database and UI
+                                                val now = System.currentTimeMillis()
+                                                val lastVal = lastUpdate.get()
+                                                if (now - lastVal > 800) {
+                                                    if (lastUpdate.compareAndSet(lastVal, now)) {
+                                                        val currentCompleted = completedSegments.get()
+                                                        val prevBytes = lastSpeedBytes.getAndSet(currentBytes)
+                                                        val durationSec = (now - lastVal) / 1000.0
+                                                        val speedBps = if (durationSec > 0) (currentBytes - prevBytes) / durationSec else 0.0
+                                                        
+                                                        val progress = currentCompleted.toFloat() / totalSegments
+                                                        val speedStr = formatSpeed(speedBps)
+                                                        
+                                                        val remainingBytes = if (progress > 0) ((currentBytes / progress) - currentBytes).toLong() else 0L
+                                                        val timeLeftStr = formatTimeLeft(remainingBytes, speedBps)
+
+                                                        repository.updateProgress(
+                                                            id,
+                                                            currentBytes,
+                                                            if (progress > 0) (currentBytes / progress).toLong() else 0L,
+                                                            progress,
+                                                            speedStr,
+                                                            timeLeftStr,
+                                                            DownloadStatus.DOWNLOADING
+                                                        )
+                                                        updateNotificationProgress((progress * 100).toInt(), speedStr)
+                                                    }
+                                                }
+                                            }
+                                        }
+                                        success = true
                                     }
                                 }
-                                success = true
+                            } catch (e: Exception) {
+                                if (isStopped) throw CancellationException("HLS stopped")
+                                delay(500)
                             }
                         }
-                    } catch (e: Exception) {
-                        delay(500)
+                    }
+
+                    if (success) {
+                        completedSegments.getAndIncrement()
+                        true
+                    } else {
+                        false
                     }
                 }
             }
 
-            // Throttle progress
-            val now = System.currentTimeMillis()
-            if (now - lastUpdate > 800 || index == totalSegments - 1) {
-                lastUpdate = now
-                val elapsedSec = (now - startTime) / 1000.0
-                val speedBps = if (elapsedSec > 0) (totalBytesDownloaded - previouslyDownloadedBytes) / elapsedSec else 0.0
-                val progress = (index + 1).toFloat() / totalSegments
-
-                val speedStr = formatSpeed(speedBps)
-                val timeLeftStr = formatTimeLeft((totalSegments - (index + 1)).toLong() * (totalBytesDownloaded / (index + 1)), speedBps)
-
-                repository.updateProgress(
-                    id,
-                    totalBytesDownloaded,
-                    if (progress > 0) (totalBytesDownloaded / progress).toLong() else 0L,
-                    progress,
-                    speedStr,
-                    timeLeftStr,
-                    DownloadStatus.DOWNLOADING
-                )
-                updateNotificationProgress((progress * 100).toInt(), speedStr)
+            val results = jobs.awaitAll()
+            if (!results.all { it } && !isStopped) {
+                throw Exception("Some HLS TS segments failed to download completely")
             }
         }
 

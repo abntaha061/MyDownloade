@@ -91,25 +91,26 @@ fun HomeScreen() {
         },
         bottomBar = {
             NavigationBar(
-                windowInsets = WindowInsets.navigationBars
+                windowInsets = WindowInsets.navigationBars,
+                containerColor = MaterialTheme.colorScheme.surfaceColorAtElevation(3.dp)
             ) {
                 NavigationBarItem(
                     selected = currentTab == 0,
                     onClick = { currentTab = 0 },
                     icon = { Icon(imageVector = Icons.Default.Language, contentDescription = "Browser") },
-                    label = { Text("المتصفح\nBrowser", style = MaterialTheme.typography.labelSmall) }
+                    label = { Text("المتصفح", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold, maxLines = 1) }
                 )
                 NavigationBarItem(
                     selected = currentTab == 1,
                     onClick = { currentTab = 1 },
                     icon = { Icon(imageVector = Icons.Default.Download, contentDescription = "Downloads") },
-                    label = { Text("التحميلات\nDownloads", style = MaterialTheme.typography.labelSmall) }
+                    label = { Text("التحميلات", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold, maxLines = 1) }
                 )
                 NavigationBarItem(
                     selected = currentTab == 2,
                     onClick = { currentTab = 2 },
                     icon = { Icon(imageVector = Icons.Default.Settings, contentDescription = "Settings") },
-                    label = { Text("الإعدادات\nSettings", style = MaterialTheme.typography.labelSmall) }
+                    label = { Text("الإعدادات", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold, maxLines = 1) }
                 )
             }
         },
