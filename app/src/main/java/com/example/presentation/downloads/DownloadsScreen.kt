@@ -250,6 +250,18 @@ fun DownloadItemCard(
                         )
                     }
                 }
+
+                if (task.status == DownloadStatus.FAILED && !task.errorMessage.isNullOrBlank()) {
+                    Spacer(modifier = Modifier.height(6.dp))
+                    Text(
+                        text = "الخطأ (Reason): ${task.errorMessage}",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.error,
+                        modifier = Modifier.fillMaxWidth(),
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
             } else {
                 // Completed layout indicator
                 Row(

@@ -18,7 +18,9 @@ data class DownloadEntity(
     val timeLeft: String,
     val progress: Float,
     val errorMessage: String?,
-    val addedTimestamp: Long
+    val addedTimestamp: Long,
+    val referer: String? = null,
+    val userAgent: String? = null
 ) {
     fun toDomain(): DownloadTask {
         val statusEnum = try {
@@ -38,7 +40,9 @@ data class DownloadEntity(
             timeLeft = timeLeft,
             progress = progress,
             errorMessage = errorMessage,
-            addedTimestamp = addedTimestamp
+            addedTimestamp = addedTimestamp,
+            referer = referer,
+            userAgent = userAgent
         )
     }
 
@@ -56,7 +60,9 @@ data class DownloadEntity(
                 timeLeft = task.timeLeft,
                 progress = task.progress,
                 errorMessage = task.errorMessage,
-                addedTimestamp = task.addedTimestamp
+                addedTimestamp = task.addedTimestamp,
+                referer = task.referer,
+                userAgent = task.userAgent
             )
         }
     }

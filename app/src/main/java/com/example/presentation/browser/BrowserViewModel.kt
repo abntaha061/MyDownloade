@@ -42,7 +42,7 @@ class BrowserViewModel(context: Context) : ViewModel() {
         
         viewModelScope.launch {
             try {
-                val videoInfo = extractUseCase.extract(url, detectedTitle)
+                val videoInfo = extractUseCase.extract(url, _currentUrl.value, detectedTitle)
                 _detectedVideo.value = videoInfo
             } catch (e: Exception) {
                 e.printStackTrace()
@@ -61,7 +61,9 @@ class BrowserViewModel(context: Context) : ViewModel() {
                 url = format.url,
                 title = customTitle.ifBlank { video.title },
                 quality = format.quality,
-                ext = format.ext
+                ext = format.ext,
+                referer = format.headers["Referer"],
+                userAgent = format.headers["User-Agent"]
             )
             clearDetectedVideo()
         }

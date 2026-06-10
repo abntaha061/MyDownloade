@@ -12,7 +12,9 @@ data class DownloadTask(
     val timeLeft: String, // e.g. "00:25"
     val progress: Float, // 0.0 to 1.0
     val errorMessage: String? = null,
-    val addedTimestamp: Long
+    val addedTimestamp: Long,
+    val referer: String? = null,
+    val userAgent: String? = null
 )
 
 enum class DownloadStatus {

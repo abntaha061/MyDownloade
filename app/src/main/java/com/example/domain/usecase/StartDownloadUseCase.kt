@@ -9,7 +9,14 @@ import java.util.UUID
 class StartDownloadUseCase(
     private val downloadRepository: DownloadRepository
 ) {
-    suspend fun execute(url: String, title: String, quality: String, ext: String): DownloadTask {
+    suspend fun execute(
+        url: String, 
+        title: String, 
+        quality: String, 
+        ext: String,
+        referer: String? = null,
+        userAgent: String? = null
+    ): DownloadTask {
         val id = UUID.randomUUID().toString()
         val cleanedTitle = title.replace("[\\\\/:*?\"<>|]".toRegex(), "_")
             .trim()
@@ -39,7 +46,9 @@ class StartDownloadUseCase(
             speed = "0 KB/s",
             timeLeft = "Pending",
             progress = 0.0f,
-            addedTimestamp = System.currentTimeMillis()
+            addedTimestamp = System.currentTimeMillis(),
+            referer = referer,
+            userAgent = userAgent
         )
 
         downloadRepository.insertDownload(task)

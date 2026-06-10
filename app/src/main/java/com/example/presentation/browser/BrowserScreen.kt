@@ -325,14 +325,37 @@ fun WebViewCompose(
  * Evaluates whether a network URL contains video files or stream indicators
  */
 fun isSniffableVideoUrl(url: String): Boolean {
-    val cleanUrl = url.lowercase().split("?")[0]
+    val lower = url.lowercase()
+    val cleanUrl = lower.split("?")[0]
+    
+    // Ignore common non-video files to prevent false alarms
+    if (cleanUrl.endsWith(".js") || cleanUrl.endsWith(".css") || 
+        cleanUrl.endsWith(".jpg") || cleanUrl.endsWith(".jpeg") || 
+        cleanUrl.endsWith(".png") || cleanUrl.endsWith(".gif") || 
+        cleanUrl.endsWith(".svg") || cleanUrl.endsWith(".webp") ||
+        cleanUrl.endsWith(".woff") || cleanUrl.endsWith(".woff2") || 
+        cleanUrl.endsWith(".json") || cleanUrl.endsWith(".html") || 
+        cleanUrl.endsWith(".htm") || lower.contains("analytics") || 
+        lower.contains("google-analytics") || lower.contains("doubleclick")) {
+        return false
+    }
+
     return cleanUrl.endsWith(".mp4") ||
+            cleanUrl.contains(".mp4") ||
             cleanUrl.endsWith(".m3u8") ||
+            cleanUrl.contains(".m3u8") ||
             cleanUrl.endsWith(".webm") ||
+            cleanUrl.contains(".webm") ||
             cleanUrl.endsWith(".ts") ||
+            cleanUrl.contains(".ts") ||
             cleanUrl.endsWith(".mkv") ||
-            cleanUrl.contains("video/mp4") ||
-            (cleanUrl.contains(".m3u8") && !cleanUrl.endsWith(".js"))
+            cleanUrl.contains(".mkv") ||
+            lower.contains("video/mp4") ||
+            lower.contains("mime=video") ||
+            lower.contains("/mp4/") ||
+            lower.contains("/video-") ||
+            lower.contains("/video/") ||
+            lower.contains("googlevideo.com")
 }
 
 private fun sanitizeUrl(input: String): String {
@@ -411,6 +434,25 @@ fun DownloadBottomSheetDialog(
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.primary
                     )
+
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    Card(
+                        colors = CardDefaults.cardColors(
+                            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f)
+                        ),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 4.dp)
+                    ) {
+                        Text(
+                            text = "الرابط المكتشف (Detected URL):\n${videoInfo.sourceUrl}",
+                            style = MaterialTheme.typography.bodySmall,
+                            modifier = Modifier.padding(8.dp),
+                            maxLines = 3,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
 
                     Spacer(modifier = Modifier.height(12.dp))
 

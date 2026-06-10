@@ -36,12 +36,18 @@ class DownloadWorker(
     private val channelId = "idm_downloads_channel"
     private var notificationId = 0
     private var downloadTitle = "Downloading File"
+    
+    private var workerReferer: String? = null
+    private var workerUserAgent: String = "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Mobile Safari/537.36"
 
     override suspend fun doWork(): Result {
         val downloadId = inputData.getString("DOWNLOAD_ID") ?: return Result.failure()
         val downloadUrl = inputData.getString("DOWNLOAD_URL") ?: return Result.failure()
         val downloadPath = inputData.getString("DOWNLOAD_PATH") ?: return Result.failure()
         downloadTitle = inputData.getString("DOWNLOAD_TITLE") ?: "Video File"
+        
+        workerReferer = inputData.getString("DOWNLOAD_REFERER")
+        workerUserAgent = inputData.getString("DOWNLOAD_USER_AGENT") ?: "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Mobile Safari/537.36"
         
         notificationId = downloadId.hashCode()
         createNotificationChannel()
@@ -133,8 +139,7 @@ class DownloadWorker(
                         
                         while (chunkRetries < 3 && !chunkSuccess && !isStopped) {
                             try {
-                                val request = Request.Builder()
-                                    .url(urlString)
+                                val request = createRequestBuilder(urlString)
                                     .addHeader("Range", "bytes=$startByte-$endByte")
                                     .build()
 
@@ -205,7 +210,7 @@ class DownloadWorker(
             }
         } else {
             // Fallback: Default Stream Downloader
-            val request = Request.Builder().url(urlString).build()
+            val request = createRequestBuilder(urlString).build()
             client.newCall(request).execute().use { response ->
                 if (!response.isSuccessful) throw Exception("Response failing: ${response.code}")
                 val body = response.body ?: throw Exception("Null stream body")
@@ -256,7 +261,7 @@ class DownloadWorker(
      */
     private suspend fun downloadHlsStream(id: String, m3u8Url: String, path: String) {
         // Fetch raw m3u8 playlist index
-        val request = Request.Builder().url(m3u8Url).build()
+        val request = createRequestBuilder(m3u8Url).build()
         val playlistContent = client.newCall(request).execute().use { response ->
             if (!response.isSuccessful) throw Exception("m3u8 index fetch failed: ${response.code}")
             response.body?.string() ?: throw Exception("Empty m3u8 payload")
@@ -302,7 +307,7 @@ class DownloadWorker(
                 while (tryCount < 3 && !success && !isStopped) {
                     try {
                         tryCount++
-                        val segRequest = Request.Builder().url(segmentUrl).build()
+                        val segRequest = createRequestBuilder(segmentUrl).build()
                         client.newCall(segRequest).execute().use { response ->
                             if (response.isSuccessful) {
                                 val body = response.body ?: throw Exception("Null TS chunk")
@@ -358,9 +363,18 @@ class DownloadWorker(
         }
     }
 
+    private fun createRequestBuilder(url: String): Request.Builder {
+        val builder = Request.Builder().url(url)
+        builder.addHeader("User-Agent", workerUserAgent)
+        workerReferer?.let {
+            builder.addHeader("Referer", it)
+        }
+        return builder
+    }
+
     private fun checkRangeSupport(url: String): Boolean {
         return try {
-            val request = Request.Builder().url(url).head().build()
+            val request = createRequestBuilder(url).head().build()
             client.newCall(request).execute().use { response ->
                 response.isSuccessful && response.header("Accept-Ranges") == "bytes"
             }
@@ -371,7 +385,7 @@ class DownloadWorker(
 
     private fun fetchContentLength(url: String): Long {
         return try {
-            val request = Request.Builder().url(url).head().build()
+            val request = createRequestBuilder(url).head().build()
             client.newCall(request).execute().use { response ->
                 if (response.isSuccessful) {
                     response.header("Content-Length")?.toLongOrNull() ?: 0L

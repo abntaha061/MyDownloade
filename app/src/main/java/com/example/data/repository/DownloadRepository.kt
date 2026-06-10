@@ -136,6 +136,8 @@ class DownloadRepository(
             .putString("DOWNLOAD_URL", task.url)
             .putString("DOWNLOAD_PATH", task.filePath)
             .putString("DOWNLOAD_TITLE", task.title)
+            .putString("DOWNLOAD_REFERER", task.referer)
+            .putString("DOWNLOAD_USER_AGENT", task.userAgent)
             .build()
 
         val workRequest = OneTimeWorkRequestBuilder<DownloadWorker>()

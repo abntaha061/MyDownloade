@@ -9,41 +9,48 @@ import java.net.URLDecoder
 class ExtractVideoUseCase {
     private val client = OkHttpClient()
 
-    suspend fun extract(url: String, detectedTitle: String? = null): VideoInfo {
+    suspend fun extract(url: String, referer: String? = null, detectedTitle: String? = null): VideoInfo {
         val title = detectedTitle ?: extractTitleFromUrl(url)
         val formats = mutableListOf<VideoFormat>()
+
+        val userAgent = "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Mobile Safari/537.36"
+        val videoHeaders = mutableMapOf<String, String>()
+        videoHeaders["User-Agent"] = userAgent
+        if (!referer.isNullOrBlank()) {
+            videoHeaders["Referer"] = referer
+        }
 
         try {
             val isM3u8 = url.contains(".m3u8") || url.contains("m3u8")
             val isMp4 = url.contains(".mp4") || url.contains("mp4")
             
             if (isM3u8 || isMp4 || url.contains(".ts") || url.contains(".webm") || url.contains(".mkv")) {
-                val size = fetchContentLength(url)
+                val size = fetchContentLength(url, videoHeaders)
                 val ext = if (isM3u8) "mp4" else extractExtension(url)
 
                 if (isM3u8) {
                     // Offer multiple streaming qualities representing chunks
-                    formats.add(VideoFormat("1080p (Stream)", url, "mp4", size, true))
-                    formats.add(VideoFormat("720p (Stream)", url, "mp4", (size * 0.7).toLong(), true))
-                    formats.add(VideoFormat("480p (Stream)", url, "mp4", (size * 0.4).toLong(), true))
-                    formats.add(VideoFormat("Audio Only", url, "mp3", (size * 0.1).toLong(), false))
+                    formats.add(VideoFormat("1080p (Stream)", url, "mp4", size, true, videoHeaders))
+                    formats.add(VideoFormat("720p (Stream)", url, "mp4", (size * 0.7).toLong(), true, videoHeaders))
+                    formats.add(VideoFormat("480p (Stream)", url, "mp4", (size * 0.4).toLong(), true, videoHeaders))
+                    formats.add(VideoFormat("Audio Only", url, "mp3", (size * 0.1).toLong(), false, videoHeaders))
                 } else {
-                    formats.add(VideoFormat("1080p (HD)", url, ext, size, false))
-                    formats.add(VideoFormat("720p (Medium)", url, ext, (size * 0.7).toLong(), false))
-                    formats.add(VideoFormat("480p (SD)", url, ext, (size * 0.4).toLong(), false))
-                    formats.add(VideoFormat("Audio Only (mp3)", url, "mp3", 0, false))
+                    formats.add(VideoFormat("1080p (HD)", url, ext, size, false, videoHeaders))
+                    formats.add(VideoFormat("720p (Medium)", url, ext, (size * 0.7).toLong(), false, videoHeaders))
+                    formats.add(VideoFormat("480p (SD)", url, ext, (size * 0.4).toLong(), false, videoHeaders))
+                    formats.add(VideoFormat("Audio Only (mp3)", url, "mp3", 0, false, videoHeaders))
                 }
             } else {
-                formats.add(VideoFormat("720p (Default)", url, "mp4", 0, false))
-                formats.add(VideoFormat("480p (Low Mobile)", url, "mp4", 0, false))
-                formats.add(VideoFormat("Audio Track (mp3)", url, "mp3", 0, false))
+                formats.add(VideoFormat("720p (Default)", url, "mp4", 0, false, videoHeaders))
+                formats.add(VideoFormat("480p (Low Mobile)", url, "mp4", 0, false, videoHeaders))
+                formats.add(VideoFormat("Audio Track (mp3)", url, "mp3", 0, false, videoHeaders))
             }
         } catch (e: Exception) {
-            formats.add(VideoFormat("Default Quality", url, "mp4", 0, false))
+            formats.add(VideoFormat("Default Quality", url, "mp4", 0, false, videoHeaders))
         }
 
         if (formats.isEmpty()) {
-            formats.add(VideoFormat("Best Quality", url, "mp4", 0, false))
+            formats.add(VideoFormat("Best Quality", url, "mp4", 0, false, videoHeaders))
         }
 
         return VideoInfo(
@@ -83,10 +90,14 @@ class ExtractVideoUseCase {
         }
     }
 
-    private suspend fun fetchContentLength(url: String): Long {
+    private suspend fun fetchContentLength(url: String, headers: Map<String, String>): Long {
         return kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
             try {
-                val request = Request.Builder().url(url).head().build()
+                val builder = Request.Builder().url(url).head()
+                headers.forEach { (key, value) ->
+                    builder.addHeader(key, value)
+                }
+                val request = builder.build()
                 client.newCall(request).execute().use { response ->
                     if (response.isSuccessful) {
                         response.header("Content-Length")?.toLongOrNull() ?: 0L
