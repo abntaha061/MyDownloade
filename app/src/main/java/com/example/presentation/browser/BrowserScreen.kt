@@ -30,6 +30,8 @@ import androidx.compose.ui.viewinterop.AndroidView
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.unit.LayoutDirection
 import com.example.data.model.VideoFormat
 import com.example.data.model.VideoInfo
 import java.net.URLDecoder
@@ -49,6 +51,13 @@ fun BrowserScreen(
     val focusManager = LocalFocusManager.current
     val context = LocalContext.current
     var lastBackPressTime by remember { mutableStateOf(0L) }
+    var showBottomSheet by remember { mutableStateOf(false) }
+
+    LaunchedEffect(detectedVideo) {
+         if (detectedVideo == null) {
+              showBottomSheet = false
+         }
+    }
 
     androidx.activity.compose.BackHandler(enabled = true) {
         if (webViewInstance?.canGoBack() == true) {
@@ -227,17 +236,52 @@ fun BrowserScreen(
                     webViewInstance = webView
                 }
             )
+
+            // Floating Video Detection Badge Button (always on the right side of the screen)
+            if (detectedVideo != null) {
+                CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(bottom = 24.dp, end = 24.dp),
+                        contentAlignment = Alignment.BottomEnd
+                    ) {
+                        FloatingActionButton(
+                            onClick = { showBottomSheet = true },
+                            containerColor = MaterialTheme.colorScheme.primary,
+                            contentColor = MaterialTheme.colorScheme.onPrimary,
+                            modifier = Modifier.size(56.dp)
+                        ) {
+                            Box(contentAlignment = Alignment.Center) {
+                                Icon(
+                                    imageVector = Icons.Default.Download,
+                                    contentDescription = "Show Detected Video",
+                                    modifier = Modifier.size(28.dp)
+                                )
+                                // A small pulsing badge count
+                                Box(
+                                    modifier = Modifier
+                                        .align(Alignment.TopEnd)
+                                        .offset(x = 4.dp, y = (-4).dp)
+                                        .size(12.dp)
+                                        .background(Color.Red, shape = androidx.compose.foundation.shape.CircleShape)
+                                )
+                            }
+                        }
+                    }
+                }
+            }
         }
     }
 
     // --- Elegant Download Settings Dialog Sheet ---
-    detectedVideo?.let { videoInfo ->
+    if (showBottomSheet && detectedVideo != null) {
         DownloadBottomSheetDialog(
-            videoInfo = videoInfo,
-            onDismiss = { viewModel.clearDetectedVideo() },
+            videoInfo = detectedVideo!!,
+            onDismiss = { showBottomSheet = false },
             onConfirmDownload = { format, customTitle ->
                 viewModel.startDownload(format, customTitle)
-                viewModel.clearDetectedVideo()
+                showBottomSheet = false
             }
         )
     }
@@ -458,6 +502,7 @@ fun DownloadBottomSheetDialog(
 
                     Spacer(modifier = Modifier.height(8.dp))
 
+                    val context = LocalContext.current
                     Card(
                         colors = CardDefaults.cardColors(
                             containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f)
@@ -466,13 +511,55 @@ fun DownloadBottomSheetDialog(
                             .fillMaxWidth()
                             .padding(vertical = 4.dp)
                     ) {
-                        Text(
-                            text = "الرابط المكتشف (Detected URL):\n${videoInfo.sourceUrl}",
-                            style = MaterialTheme.typography.bodySmall,
-                            modifier = Modifier.padding(8.dp),
-                            maxLines = 3,
-                            overflow = TextOverflow.Ellipsis
-                        )
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(12.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = "الرابط المكتشف (Detected URL):",
+                                    style = MaterialTheme.typography.labelMedium,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.primary
+                                )
+                                Spacer(modifier = Modifier.height(4.dp))
+                                Text(
+                                    text = videoInfo.sourceUrl,
+                                    style = MaterialTheme.typography.bodySmall,
+                                    maxLines = 2,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                            }
+                            Spacer(modifier = Modifier.width(8.dp))
+                            IconButton(
+                                onClick = {
+                                    try {
+                                        val clipboard = context.getSystemService(android.content.Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
+                                        val clip = android.content.ClipData.newPlainText("Video URL", videoInfo.sourceUrl)
+                                        clipboard.setPrimaryClip(clip)
+                                        android.widget.Toast.makeText(context, "تم نسخ الرابط بنجاح! / Link copied!", android.widget.Toast.LENGTH_SHORT).show()
+                                    } catch (e: Exception) {
+                                        e.printStackTrace()
+                                    }
+                                },
+                                modifier = Modifier
+                                    .size(40.dp)
+                                    .background(
+                                        color = MaterialTheme.colorScheme.primary.copy(alpha = 0.15f),
+                                        shape = RoundedCornerShape(20.dp)
+                                    )
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.ContentCopy,
+                                    contentDescription = "Copy Link",
+                                    tint = MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier.size(20.dp)
+                                )
+                            }
+                        }
                     }
 
                     Spacer(modifier = Modifier.height(12.dp))
