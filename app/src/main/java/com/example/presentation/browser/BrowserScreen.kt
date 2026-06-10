@@ -20,6 +20,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
@@ -46,6 +47,26 @@ fun BrowserScreen(
     var urlInput by remember { mutableStateOf(currentUrl) }
     var webViewInstance by remember { mutableStateOf<WebView?>(null) }
     val focusManager = LocalFocusManager.current
+    val context = LocalContext.current
+    var lastBackPressTime by remember { mutableStateOf(0L) }
+
+    androidx.activity.compose.BackHandler(enabled = true) {
+        if (webViewInstance?.canGoBack() == true) {
+            webViewInstance?.goBack()
+        } else {
+            val now = System.currentTimeMillis()
+            if (now - lastBackPressTime < 2000) {
+                (context as? android.app.Activity)?.finish()
+            } else {
+                lastBackPressTime = now
+                android.widget.Toast.makeText(
+                    context,
+                    "اضغط مرة أخرى للخروج / Press back again to exit",
+                    android.widget.Toast.LENGTH_SHORT
+                ).show()
+            }
+        }
+    }
 
     // Keep urlInput in sync with ViewModel's state when a page loads
     LaunchedEffect(currentUrl) {

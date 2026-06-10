@@ -40,6 +40,10 @@ fun HomeScreen() {
     var currentTab by remember { mutableStateOf(0) } // 0 = Browser, 1 = Downloads, 2 = Settings
     var showManualUrlDialog by remember { mutableStateOf(false) }
 
+    androidx.activity.compose.BackHandler(enabled = currentTab != 0) {
+        currentTab = 0
+    }
+
     // Aggregate real-time statistics
     val totalCount = downloads.size
     val totalBytes = downloads.sumOf { it.totalBytes }

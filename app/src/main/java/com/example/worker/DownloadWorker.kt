@@ -29,7 +29,12 @@ class DownloadWorker(
         AppModule.getRepository(appContext)
     }
 
-    private val client = OkHttpClient()
+    private val client = OkHttpClient.Builder()
+        .connectTimeout(30, java.util.concurrent.TimeUnit.SECONDS)
+        .readTimeout(30, java.util.concurrent.TimeUnit.SECONDS)
+        .writeTimeout(30, java.util.concurrent.TimeUnit.SECONDS)
+        .connectionPool(okhttp3.ConnectionPool(10, 5, java.util.concurrent.TimeUnit.MINUTES))
+        .build()
     private val notificationManager =
         appContext.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
     
@@ -39,6 +44,10 @@ class DownloadWorker(
     
     private var workerReferer: String? = null
     private var workerUserAgent: String = "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Mobile Safari/537.36"
+
+    override suspend fun getForegroundInfo(): ForegroundInfo {
+        return createForegroundInfo(0, "Preparing download...")
+    }
 
     override suspend fun doWork(): Result {
         val downloadId = inputData.getString("DOWNLOAD_ID") ?: return Result.failure()
@@ -61,23 +70,36 @@ class DownloadWorker(
 
         repository.updateStatus(downloadId, DownloadStatus.DOWNLOADING)
 
+        val powerManager = appContext.getSystemService(Context.POWER_SERVICE) as android.os.PowerManager
+        val wakeLock = powerManager.newWakeLock(
+            android.os.PowerManager.PARTIAL_WAKE_LOCK,
+            "IDM:DownloadWakeLock"
+        )
+
         var attempt = 0
         var success = false
         var exceptionMsg = ""
 
-        while (attempt < 3 && !success && !isStopped) {
-            try {
-                attempt++
-                if (downloadUrl.contains(".m3u8") || downloadUrl.contains("m3u8")) {
-                    downloadHlsStream(downloadId, downloadUrl, downloadPath)
-                } else {
-                    downloadMultipartFile(downloadId, downloadUrl, downloadPath)
+        try {
+            wakeLock.acquire(15 * 60 * 1000L) // 15 mins lock timeout
+            while (attempt < 3 && !success && !isStopped) {
+                try {
+                    attempt++
+                    if (downloadUrl.contains(".m3u8") || downloadUrl.contains("m3u8")) {
+                        downloadHlsStream(downloadId, downloadUrl, downloadPath)
+                    } else {
+                        downloadMultipartFile(downloadId, downloadUrl, downloadPath)
+                    }
+                    success = true
+                } catch (e: Exception) {
+                    e.printStackTrace()
+                    exceptionMsg = e.message ?: "Network error"
+                    delay(2000) // Sleep before retry
                 }
-                success = true
-            } catch (e: Exception) {
-                e.printStackTrace()
-                exceptionMsg = e.message ?: "Network error"
-                delay(2000) // Sleep before retry
+            }
+        } finally {
+            if (wakeLock.isHeld) {
+                wakeLock.release()
             }
         }
 
@@ -114,7 +136,7 @@ class DownloadWorker(
 
         // Check if server supports Accept-Ranges and has content length
         val supportsRanges = checkRangeSupport(urlString)
-        val concurrentChunks = repository.getSettingsConcurrent().coerceIn(1, 8)
+        val concurrentChunks = repository.getSettingsConcurrent().coerceIn(1, 16)
 
         if (totalBytes > 1024 * 1024 && supportsRanges && concurrentChunks > 1) {
             // High speed Chunked/Multi-segment download
@@ -150,7 +172,7 @@ class DownloadWorker(
                                         
                                         RandomAccessFile(tempFiles[i], "rw").use { raf ->
                                             raf.seek(0)
-                                            val buffer = ByteArray(8192)
+                                            val buffer = ByteArray(65536)
                                             var bytesRead: Int
                                             while (stream.read(buffer).also { bytesRead = it } != -1) {
                                                 if (isStopped) {
@@ -218,7 +240,7 @@ class DownloadWorker(
                 val finalTotalBytes = if (totalBytes > 0) totalBytes else body.contentLength()
 
                 file.outputStream().use { fos ->
-                    val buffer = ByteArray(8192)
+                    val buffer = ByteArray(65536)
                     var bytesRead: Int
                     var totalRead = 0L
                     val startTime = System.currentTimeMillis()
@@ -312,7 +334,7 @@ class DownloadWorker(
                             if (response.isSuccessful) {
                                 val body = response.body ?: throw Exception("Null TS chunk")
                                 val stream = body.byteStream()
-                                val buffer = ByteArray(8192)
+                                val buffer = ByteArray(65536)
                                 var bytesRead: Int
                                 while (stream.read(buffer).also { bytesRead = it } != -1) {
                                     fos.write(buffer, 0, bytesRead)

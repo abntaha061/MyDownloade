@@ -78,8 +78,8 @@ fun SettingsScreen(
                 Slider(
                     value = concurrentInput,
                     onValueChange = { concurrentInput = it },
-                    valueRange = 1f..8f,
-                    steps = 6,
+                    valueRange = 1f..16f,
+                    steps = 14,
                     colors = SliderDefaults.colors(
                         activeTrackColor = MaterialTheme.colorScheme.primary,
                         thumbColor = MaterialTheme.colorScheme.primary
