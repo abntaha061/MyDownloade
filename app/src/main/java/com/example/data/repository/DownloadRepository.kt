@@ -93,11 +93,21 @@ class DownloadRepository(
     fun getSettingsSaveDir(): String {
         val prefs = context.getSharedPreferences("idm_settings", Context.MODE_PRIVATE)
         var path = prefs.getString("save_directory", null)
-        if (path == null) {
-            val defaultDir = context.getExternalFilesDir(null)?.absolutePath 
-                ?: context.filesDir.absolutePath
-            path = defaultDir
+        val defaultDir = File(
+            android.os.Environment.getExternalStoragePublicDirectory(android.os.Environment.DIRECTORY_DOWNLOADS),
+            "IDM Downloader"
+        )
+        if (path == null || path.contains("Android/data") || path.contains("com.example") || path.contains("com.aistudio") || path.contains("/files/")) {
+            path = defaultDir.absolutePath
             prefs.edit().putString("save_directory", path).apply()
+        }
+        try {
+            val dir = File(path)
+            if (!dir.exists()) {
+                dir.mkdirs()
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
         }
         return path
     }
