@@ -22,11 +22,16 @@ class SettingsViewModel(context: Context) : ViewModel() {
     private val _saveDirectory = MutableStateFlow(repository.getSettingsSaveDir())
     val saveDirectory: StateFlow<String> = _saveDirectory.asStateFlow()
 
-    fun updateSettings(concurrent: Int, wifiOnly: Boolean, quality: String, saveDirectory: String) {
+    private val _adblockEnabled = MutableStateFlow(repository.getSettingsAdBlock())
+    val adblockEnabled: StateFlow<Boolean> = _adblockEnabled.asStateFlow()
+
+    fun updateSettings(concurrent: Int, wifiOnly: Boolean, quality: String, saveDirectory: String, adblockEnabled: Boolean) {
         repository.saveSettings(concurrent, wifiOnly, quality, saveDirectory)
+        repository.saveSettingsAdBlock(adblockEnabled)
         _concurrentDownloads.value = concurrent
         _wifiOnly.value = wifiOnly
         _defaultQuality.value = quality
         _saveDirectory.value = saveDirectory
+        _adblockEnabled.value = adblockEnabled
     }
 }

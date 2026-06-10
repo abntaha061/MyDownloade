@@ -27,6 +27,15 @@ class BrowserViewModel(context: Context) : ViewModel() {
     private val _detectedVideo = MutableStateFlow<VideoInfo?>(null)
     val detectedVideo: StateFlow<VideoInfo?> = _detectedVideo.asStateFlow()
 
+    private val _isAdBlockEnabled = MutableStateFlow(repository.getSettingsAdBlock())
+    val isAdBlockEnabled: StateFlow<Boolean> = _isAdBlockEnabled.asStateFlow()
+
+    fun toggleAdBlock() {
+        val nextMode = !_isAdBlockEnabled.value
+        repository.saveSettingsAdBlock(nextMode)
+        _isAdBlockEnabled.value = nextMode
+    }
+
     fun updateUrl(url: String) {
         _currentUrl.value = url
     }
@@ -39,6 +48,11 @@ class BrowserViewModel(context: Context) : ViewModel() {
         // Guard against instant double popup
         val currentDetected = _detectedVideo.value
         if (currentDetected != null && currentDetected.sourceUrl == url) return
+
+        // If we already detected an .m3u8 (HLS master playlist), do not overwrite it with a standard video unless it is also an .m3u8
+        if (currentDetected != null && currentDetected.sourceUrl.contains("m3u8") && !url.contains("m3u8")) {
+            return
+        }
         
         viewModelScope.launch {
             try {

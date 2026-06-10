@@ -45,6 +45,7 @@ fun BrowserScreen(
     val currentUrl by viewModel.currentUrl.collectAsStateWithLifecycle()
     val isLoading by viewModel.isLoading.collectAsStateWithLifecycle()
     val detectedVideo by viewModel.detectedVideo.collectAsStateWithLifecycle()
+    val isAdBlockEnabled by viewModel.isAdBlockEnabled.collectAsStateWithLifecycle()
 
     var urlInput by remember { mutableStateOf(currentUrl) }
     var webViewInstance by remember { mutableStateOf<WebView?>(null) }
@@ -204,6 +205,21 @@ fun BrowserScreen(
                         Icon(imageVector = Icons.Default.Home, contentDescription = "Go Home")
                     }
 
+                    IconButton(onClick = {
+                        viewModel.toggleAdBlock()
+                        android.widget.Toast.makeText(
+                            context,
+                            if (!isAdBlockEnabled) "تم تفعيل مانع الإعلانات 🛡️\nAd block activated" else "تم إيقاف مانع الإعلانات ⚠️\nAd block deactivated",
+                            android.widget.Toast.LENGTH_SHORT
+                        ).show()
+                    }) {
+                        Icon(
+                            imageVector = Icons.Default.Security,
+                            contentDescription = "Toggle Ad Block",
+                            tint = if (isAdBlockEnabled) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f)
+                        )
+                    }
+
                     if (isLoading) {
                         CircularProgressIndicator(
                             modifier = Modifier.size(24.dp),
@@ -225,6 +241,7 @@ fun BrowserScreen(
         ) {
             WebViewCompose(
                 url = currentUrl,
+                isAdBlockEnabled = isAdBlockEnabled,
                 onPageProgressChanged = { _, progress ->
                     viewModel.setLoading(progress < 100)
                 },
@@ -296,6 +313,7 @@ fun BrowserScreen(
 @Composable
 fun WebViewCompose(
     url: String,
+    isAdBlockEnabled: Boolean,
     onPageProgressChanged: (WebView, Int) -> Unit,
     onUrlChanged: (String) -> Unit,
     onVideoDetected: (String) -> Unit,
@@ -309,6 +327,9 @@ fun WebViewCompose(
                     ViewGroup.LayoutParams.MATCH_PARENT
                 )
                 
+                // Store AdBlock status in tag for dynamic real-time retrieval
+                tag = isAdBlockEnabled
+
                 // Configure browser settings
                 settings.apply {
                     javaScriptEnabled = true
@@ -336,6 +357,18 @@ fun WebViewCompose(
                         url?.let { onUrlChanged(it) }
                     }
 
+                    override fun shouldOverrideUrlLoading(
+                        view: WebView?,
+                        request: WebResourceRequest?
+                    ): Boolean {
+                        val reqUrl = request?.url?.toString() ?: ""
+                        val block = view?.tag as? Boolean ?: true
+                        if (block && com.example.util.AdBlocker.isAd(reqUrl)) {
+                            return true
+                        }
+                        return false
+                    }
+
                     override fun onPageFinished(view: WebView?, url: String?) {
                         url?.let { onUrlChanged(it) }
                         // Inject element detector javascript
@@ -345,7 +378,7 @@ fun WebViewCompose(
                                     "for (var i = 0; i < videos.length; i++) {" +
                                     "   var v = videos[i];" +
                                     "   if (v.src && v.src.trim() !== '') {" +
-                                    "       window.IDM_JS_INTERFACE.onVideoFound(v.src, document.title);" +
+                                      "       window.IDM_JS_INTERFACE.onVideoFound(v.src, document.title);" +
                                     "   }" +
                                     "   var sources = v.getElementsByTagName('source');" +
                                     "   for (var j = 0; j < sources.length; j++) {" +
@@ -364,6 +397,13 @@ fun WebViewCompose(
                         request: WebResourceRequest?
                     ): WebResourceResponse? {
                         val reqUrl = request?.url?.toString() ?: ""
+                        val block = view?.tag as? Boolean ?: true
+                        
+                        // Apply AdBlocker first
+                        if (block && com.example.util.AdBlocker.isAd(reqUrl)) {
+                            return com.example.util.AdBlocker.createEmptyResponse()
+                        }
+
                         if (isSniffableVideoUrl(reqUrl)) {
                             post { onVideoDetected(reqUrl) }
                         }
@@ -382,14 +422,15 @@ fun WebViewCompose(
             }
         },
         update = { webView ->
-            // Let internal state transitions happen natively, 
-            // no need to re-trigger loadUrl here as it would disrupt active browsing
+            // Dynamically update context/state tag with no lag as user switches AdBlock shield toggles
+            webView.tag = isAdBlockEnabled
         }
     )
 }
 
 /**
  * Evaluates whether a network URL contains video files or stream indicators
+ * Excludes individual .ts segment files and encrypted key file extensions to prioritize .m3u8 playlists.
  */
 fun isSniffableVideoUrl(url: String): Boolean {
     val lower = url.lowercase()
@@ -407,14 +448,18 @@ fun isSniffableVideoUrl(url: String): Boolean {
         return false
     }
 
+    // Ignore individual TS files and encryptions keys to prevent segment fragment overwrite
+    if (cleanUrl.endsWith(".ts") || cleanUrl.contains(".ts") ||
+        cleanUrl.endsWith(".key") || cleanUrl.contains(".key")) {
+        return false
+    }
+
     return cleanUrl.endsWith(".mp4") ||
             cleanUrl.contains(".mp4") ||
             cleanUrl.endsWith(".m3u8") ||
             cleanUrl.contains(".m3u8") ||
             cleanUrl.endsWith(".webm") ||
             cleanUrl.contains(".webm") ||
-            cleanUrl.endsWith(".ts") ||
-            cleanUrl.contains(".ts") ||
             cleanUrl.endsWith(".mkv") ||
             cleanUrl.contains(".mkv") ||
             lower.contains("video/mp4") ||

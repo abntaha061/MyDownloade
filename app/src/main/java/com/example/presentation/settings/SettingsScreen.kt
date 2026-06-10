@@ -25,21 +25,24 @@ fun SettingsScreen(
     val wifiOnly by viewModel.wifiOnly.collectAsStateWithLifecycle()
     val defaultQuality by viewModel.defaultQuality.collectAsStateWithLifecycle()
     val saveDirectory by viewModel.saveDirectory.collectAsStateWithLifecycle()
+    val adblockEnabled by viewModel.adblockEnabled.collectAsStateWithLifecycle()
 
     var concurrentInput by remember { mutableStateOf(concurrentDownloads.toFloat()) }
     var wifiOnlyInput by remember { mutableStateOf(wifiOnly) }
     var qualityInput by remember { mutableStateOf(defaultQuality) }
     var saveDirInput by remember { mutableStateOf(saveDirectory) }
+    var adblockInput by remember { mutableStateOf(adblockEnabled) }
     
     var showQualityDropdown by remember { mutableStateOf(false) }
     val qualityOptions = listOf("1080p", "720p", "480p", "360p", "Audio Only")
 
     // Sync state if changed externally
-    LaunchedEffect(concurrentDownloads, wifiOnly, defaultQuality, saveDirectory) {
+    LaunchedEffect(concurrentDownloads, wifiOnly, defaultQuality, saveDirectory, adblockEnabled) {
         concurrentInput = concurrentDownloads.toFloat()
         wifiOnlyInput = wifiOnly
         qualityInput = defaultQuality
         saveDirInput = saveDirectory
+        adblockInput = adblockEnabled
     }
 
     val scrollState = rememberScrollState()
@@ -237,6 +240,47 @@ fun SettingsScreen(
             }
         }
 
+        // --- Card 5: Real Ad Blocker Toggle ---
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(16.dp),
+            colors = CardDefaults.cardColors(
+                containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f)
+            ),
+            border = androidx.compose.foundation.BorderStroke(
+                width = 1.dp,
+                color = MaterialTheme.colorScheme.primary.copy(alpha = 0.2f)
+            )
+        ) {
+            Column(modifier = Modifier.padding(16.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(imageVector = Icons.Default.Security, contentDescription = "Adblock", tint = MaterialTheme.colorScheme.primary)
+                    Spacer(modifier = Modifier.width(12.dp))
+                    Column {
+                        Text("مانع الإعلانات (Ad Blocker)", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleMedium)
+                        Text("أداة منع النوافذ المنبثقة وإعلانات إعادة التوجيه المزعجة", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text("حظر النوافذ المنبثقة والإعلانات", fontWeight = FontWeight.SemiBold, style = MaterialTheme.typography.bodyMedium)
+                        Text("Block ads, banners, pop-unders and redirection tabs", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                    Switch(
+                        checked = adblockInput,
+                        onCheckedChange = { adblockInput = it }
+                    )
+                }
+            }
+        }
+
         Spacer(modifier = Modifier.height(10.dp))
 
         // --- Save Settings Trigger ---
@@ -246,7 +290,8 @@ fun SettingsScreen(
                     concurrent = concurrentInput.toInt(),
                     wifiOnly = wifiOnlyInput,
                     quality = qualityInput,
-                    saveDirectory = saveDirInput
+                    saveDirectory = saveDirInput,
+                    adblockEnabled = adblockInput
                 )
             },
             modifier = Modifier

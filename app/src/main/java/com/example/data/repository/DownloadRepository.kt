@@ -90,6 +90,17 @@ class DownloadRepository(
             .getString("default_quality", "720p") ?: "720p"
     }
 
+    fun getSettingsAdBlock(): Boolean {
+        return context.getSharedPreferences("idm_settings", Context.MODE_PRIVATE)
+            .getBoolean("adblock_enabled", true)
+    }
+
+    fun saveSettingsAdBlock(enabled: Boolean) {
+        context.getSharedPreferences("idm_settings", Context.MODE_PRIVATE).edit()
+            .putBoolean("adblock_enabled", enabled)
+            .apply()
+    }
+
     fun getSettingsSaveDir(): String {
         val prefs = context.getSharedPreferences("idm_settings", Context.MODE_PRIVATE)
         var path = prefs.getString("save_directory", null)
