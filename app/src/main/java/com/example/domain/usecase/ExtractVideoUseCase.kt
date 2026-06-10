@@ -10,7 +10,29 @@ class ExtractVideoUseCase {
     private val client = OkHttpClient()
 
     suspend fun extract(url: String, referer: String? = null, detectedTitle: String? = null): VideoInfo {
-        val title = detectedTitle ?: extractTitleFromUrl(url)
+        var rawParsedTitle = detectedTitle ?: extractTitleFromUrl(url)
+        if (!detectedTitle.isNullOrBlank()) {
+            var tempTitle: String = detectedTitle
+            val suffixesToRemove = listOf(
+                " - Watch Wrestling", " | Watch-Wrestling", " - watch-wrestling", " - Watch-Wrestling",
+                " - PornoVip.gratis", " - pornovip", " - PornoVip", " - www.pornovip.gratis",
+                " - Dailymotion", " - OK.ru", " - ok.ru", " - YouTube",
+                " - stream online", " | stream", " - Stream", " | On-line", " - On-line",
+                ".mp4", ".m3u8", ".webm", ".mkv"
+            )
+            for (suffix in suffixesToRemove) {
+                if (tempTitle.lowercase().contains(suffix.lowercase())) {
+                    val index = tempTitle.lowercase().indexOf(suffix.lowercase())
+                    if (index != -1) {
+                        tempTitle = tempTitle.substring(0, index)
+                    }
+                }
+            }
+            if (tempTitle.isNotBlank()) {
+                rawParsedTitle = tempTitle.trim()
+            }
+        }
+        val title = rawParsedTitle
         val formats = mutableListOf<VideoFormat>()
 
         val userAgent = "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Mobile Safari/537.36"

@@ -248,8 +248,8 @@ fun BrowserScreen(
                 onUrlChanged = { newUrl ->
                     viewModel.updateUrl(newUrl)
                 },
-                onVideoDetected = { detectedUrl ->
-                    viewModel.onVideoLinkDetected(detectedUrl)
+                onVideoDetected = { detectedUrl, pageTitle ->
+                    viewModel.onVideoLinkDetected(detectedUrl, pageTitle)
                 },
                 onCreated = { webView ->
                     webViewInstance = webView
@@ -316,7 +316,7 @@ fun WebViewCompose(
     isAdBlockEnabled: Boolean,
     onPageProgressChanged: (WebView, Int) -> Unit,
     onUrlChanged: (String) -> Unit,
-    onVideoDetected: (String) -> Unit,
+    onVideoDetected: (String, String?) -> Unit,
     onCreated: (WebView) -> Unit
 ) {
     AndroidView(
@@ -345,7 +345,7 @@ fun WebViewCompose(
                         @JavascriptInterface
                         fun onVideoFound(videoUrl: String, title: String) {
                             post {
-                                onVideoDetected(videoUrl)
+                                onVideoDetected(videoUrl, title)
                             }
                         }
                     },
@@ -405,7 +405,8 @@ fun WebViewCompose(
                         }
 
                         if (isSniffableVideoUrl(reqUrl)) {
-                            post { onVideoDetected(reqUrl) }
+                            val pageTitle = view?.title
+                            post { onVideoDetected(reqUrl, pageTitle) }
                         }
                         return super.shouldInterceptRequest(view, request)
                     }

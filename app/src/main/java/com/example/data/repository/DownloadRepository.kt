@@ -23,6 +23,10 @@ class DownloadRepository(
         return downloadDao.getDownloadById(id)?.toDomain()
     }
 
+    suspend fun isFilePathInUse(filePath: String): Boolean {
+        return downloadDao.countByFilePath(filePath) > 0
+    }
+
     suspend fun insertDownload(task: DownloadTask) {
         downloadDao.insertDownload(DownloadEntity.fromDomain(task))
     }

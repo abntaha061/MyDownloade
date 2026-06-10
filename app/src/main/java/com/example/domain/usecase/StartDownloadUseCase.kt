@@ -21,10 +21,17 @@ class StartDownloadUseCase(
         val cleanedTitle = title.replace("[\\\\/:*?\"<>|]".toRegex(), "_")
             .trim()
             .ifBlank { "Video_${System.currentTimeMillis() % 100000}" }
-        val fileName = "${cleanedTitle}_$quality.$ext"
         
         val saveDir = downloadRepository.getSettingsSaveDir()
-        val file = File(saveDir, fileName)
+        
+        var finalFile = File(saveDir, "${cleanedTitle}_$quality.$ext")
+        var finalTitle = cleanedTitle
+        var counter = 1
+        while (finalFile.exists() || downloadRepository.isFilePathInUse(finalFile.absolutePath)) {
+            finalTitle = "${cleanedTitle} ($counter)"
+            finalFile = File(saveDir, "${finalTitle}_$quality.$ext")
+            counter++
+        }
         
         try {
             val dir = File(saveDir)
@@ -38,8 +45,8 @@ class StartDownloadUseCase(
         val task = DownloadTask(
             id = id,
             url = url,
-            title = cleanedTitle,
-            filePath = file.absolutePath,
+            title = finalTitle,
+            filePath = finalFile.absolutePath,
             status = DownloadStatus.PENDING,
             totalBytes = 0L,
             downloadedBytes = 0L,

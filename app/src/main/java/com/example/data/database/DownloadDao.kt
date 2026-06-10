@@ -34,6 +34,9 @@ interface DownloadDao {
     @Query("DELETE FROM downloads WHERE id = :id")
     suspend fun deleteDownloadById(id: String)
 
+    @Query("SELECT COUNT(*) FROM downloads WHERE filePath = :filePath")
+    suspend fun countByFilePath(filePath: String): Int
+
     @Query("DELETE FROM downloads")
     suspend fun deleteAll()
 }
