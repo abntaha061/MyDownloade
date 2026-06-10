@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    
+    <!-- Outer Ambient Glow Ring representing safe area and high-speed orbit -->
+    <path
+        android:pathData="M54,54m-33,0a33,33 0,1 1,66 0a33,33 0,1 1,-66 0"
+        android:strokeWidth="2.5"
+        android:strokeColor="#FFFFFF"
+        android:strokeAlpha="0.4"
+        android:fillColor="#1AFFFFFF" />
+
+    <!-- Outer Speed Dots indicating multi-connection / multi-threaded flow -->
+    <path
+        android:pathData="M32,32 A2.5,2.5 0 1,1 32,32.1 Z M76,32 A2.5,2.5 0 1,1 76,32.1 Z M32,76 A2.5,2.5 0 1,1 32,76.1 Z M76,76 A2.5,2.5 0 1,1 76,76.1 Z"
+        android:fillColor="#00E676" />
+
+    <!-- IDM Segmented Download Speed Lines -->
+    <!-- Segment 1: Packet Top -->
+    <path
+        android:pathData="M 46,22 H 62 V 29 H 46 Z"
+        android:fillColor="#FFFFFF" />
+
+    <!-- Segment 2: Packet Middle -->
+    <path
+        android:pathData="M 46,32 H 62 V 39 H 46 Z"
+        android:fillColor="#FFFFFF" />
+
+    <!-- Segment 3: Primary Core Arrow Head -->
+    <path
+        android:pathData="M 46,42 H 62 V 51 H 74 L 54,71 L 34,51 H 46 Z"
+        android:fillColor="#FFFFFF" />
+
+    <!-- Segment 4: Solid Ground/Drive Buffer tray (Speed Green) -->
+    <path
+        android:pathData="M 32,77 H 76 C 77.4,77 78.5,78.1 78.5,79.5 C 78.5,80.9 77.4,82 76,82 H 32 C 30.6,82 29.5,80.9 29.5,79.5 C 29.5,78.1 30.6,77 32,77 Z"
+        android:fillColor="#00E676" />
+        
+</vector>

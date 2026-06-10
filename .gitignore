@@ -1,0 +1,36 @@
+# Built development folders
+.gradle/
+build/
+/*/build/
+.kotlin/
+
+# IDE Intelij / Android Studio files
+.idea/
+*.iml
+*.ipr
+*.iws
+.navigation/
+
+# OS-generated files
+.DS_Store
+Thumbs.db
+
+# Local configuration/credentials files
+local.properties
+.env
+*.keystore
+*.jks
+*.p12
+*.properties.local
+
+# Build outputs and Android package files
+*.apk
+*.ap_
+*.aab
+/.build-outputs/
+/*.keystore.base64
+
+# Log files
+*.log
+
+

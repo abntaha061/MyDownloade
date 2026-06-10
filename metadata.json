@@ -1,0 +1,6 @@
+{
+  "name": "IDM Downloader",
+  "description": "A high-performance parallel chunked video downloader with an integrated browser client featuring real-time stream interception, matching IDM functionalities.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
