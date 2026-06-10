@@ -429,11 +429,29 @@ fun WebViewCompose(
 }
 
 /**
- * Evaluates whether a network URL contains video files or stream indicators
- * Excludes individual .ts segment files and encrypted key file extensions to prioritize .m3u8 playlists.
+ * Evaluates whether a network URL contains video files or stream indicators.
+ * Fully supports files inside query parameters (like type=m3u8 or url=video.mp4)
+ * Excludes individual .ts segment files, encryption keys, and placeholder stubs (stub.mp4/empty.mp4)
  */
 fun isSniffableVideoUrl(url: String): Boolean {
     val lower = url.lowercase()
+    
+    // Check for common placebo, placeholder, and tracking stubs
+    if (lower.contains("stub.mp4") || 
+        lower.contains("/stub/") || 
+        lower.contains("/stub-") || 
+        lower.contains("empty.mp4") || 
+        lower.contains("black.mp4") || 
+        lower.contains("loading.mp4") || 
+        lower.contains("holder.mp4") || 
+        lower.contains("place_holder") || 
+        lower.contains("click_tracker") ||
+        lower.contains("analytics") || 
+        lower.contains("google-analytics") || 
+        lower.contains("doubleclick")) {
+        return false
+    }
+
     val cleanUrl = lower.split("?")[0]
     
     // Ignore common non-video files to prevent false alarms
@@ -443,31 +461,38 @@ fun isSniffableVideoUrl(url: String): Boolean {
         cleanUrl.endsWith(".svg") || cleanUrl.endsWith(".webp") ||
         cleanUrl.endsWith(".woff") || cleanUrl.endsWith(".woff2") || 
         cleanUrl.endsWith(".json") || cleanUrl.endsWith(".html") || 
-        cleanUrl.endsWith(".htm") || lower.contains("analytics") || 
-        lower.contains("google-analytics") || lower.contains("doubleclick")) {
+        cleanUrl.endsWith(".htm")) {
         return false
     }
 
-    // Ignore individual TS files and encryptions keys to prevent segment fragment overwrite
+    // Ignore individual TS files, encryption keys, and segment chunks to prevent master list overwrite
     if (cleanUrl.endsWith(".ts") || cleanUrl.contains(".ts") ||
-        cleanUrl.endsWith(".key") || cleanUrl.contains(".key")) {
+        cleanUrl.endsWith(".key") || cleanUrl.contains(".key") ||
+        lower.contains("/ts/") || lower.contains(".key?") || lower.contains("/chunk-")) {
         return false
     }
 
+    // Match video stream indicators both in the pathname and parameters (e.g. streaming links inside query params)
     return cleanUrl.endsWith(".mp4") ||
-            cleanUrl.contains(".mp4") ||
             cleanUrl.endsWith(".m3u8") ||
-            cleanUrl.contains(".m3u8") ||
             cleanUrl.endsWith(".webm") ||
-            cleanUrl.contains(".webm") ||
             cleanUrl.endsWith(".mkv") ||
-            cleanUrl.contains(".mkv") ||
+            lower.contains(".m3u8") ||
+            lower.contains(".mp4") ||
+            lower.contains(".webm") ||
+            lower.contains(".mkv") ||
             lower.contains("video/mp4") ||
             lower.contains("mime=video") ||
             lower.contains("/mp4/") ||
             lower.contains("/video-") ||
             lower.contains("/video/") ||
-            lower.contains("googlevideo.com")
+            lower.contains("googlevideo.com") ||
+            lower.contains("/hls/") ||
+            lower.contains("/get_hls") ||
+            lower.contains("get_video") ||
+            lower.contains("master.m3u8") ||
+            lower.contains("playlist.m3u8") ||
+            lower.contains("stream.m3u8")
 }
 
 private fun sanitizeUrl(input: String): String {

@@ -45,6 +45,19 @@ class BrowserViewModel(context: Context) : ViewModel() {
     }
 
     fun onVideoLinkDetected(url: String, detectedTitle: String? = null) {
+        val lowerUrl = url.lowercase()
+        // Reject non-http/https schemas and obvious placeholder stubs
+        if (url.startsWith("blob:") || 
+            url.startsWith("data:") || 
+            url.startsWith("chrome:") || 
+            lowerUrl.contains("stub.mp4") || 
+            lowerUrl.contains("/stub") ||
+            lowerUrl.contains("empty.mp4") ||
+            lowerUrl.contains("black.mp4") ||
+            lowerUrl.contains("loading.mp4")) {
+            return
+        }
+
         // Guard against instant double popup
         val currentDetected = _detectedVideo.value
         if (currentDetected != null && currentDetected.sourceUrl == url) return
