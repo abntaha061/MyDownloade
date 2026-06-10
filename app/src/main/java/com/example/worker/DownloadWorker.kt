@@ -115,6 +115,16 @@ class DownloadWorker(
             } catch (e: Exception) {
                 e.printStackTrace()
             }
+            val finalFileLength = File(downloadPath).length()
+            repository.updateProgress(
+                downloadId,
+                finalFileLength,
+                finalFileLength,
+                1.0f,
+                "0 KB/s",
+                "Completed",
+                DownloadStatus.COMPLETED
+            )
             repository.updateStatus(downloadId, DownloadStatus.COMPLETED)
             updateFinishedNotification(true)
             Result.success()
@@ -159,7 +169,7 @@ class DownloadWorker(
             val jobs = mutableListOf<Deferred<Boolean>>()
             
             val tempFiles = List(concurrentChunks) { index ->
-                File(path + ".part$index")
+                File(path + "_" + id + ".part$index")
             }
 
             // High precision Resume Support: seed downloadedBytes with the sums of already existing part files
@@ -342,7 +352,7 @@ class DownloadWorker(
         }
 
         // Temporary folder for TS chunks to support full, reliable resume
-        val segmentsDir = File(path + "_temp_segments")
+        val segmentsDir = File(path + "_" + id + "_temp_segments")
         if (!segmentsDir.exists()) {
             segmentsDir.mkdirs()
         }

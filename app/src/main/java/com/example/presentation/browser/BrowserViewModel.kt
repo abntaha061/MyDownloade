@@ -36,8 +36,39 @@ class BrowserViewModel(context: Context) : ViewModel() {
         _isAdBlockEnabled.value = nextMode
     }
 
+    private val _currentPageTitle = MutableStateFlow("")
+    val currentPageTitle: StateFlow<String> = _currentPageTitle.asStateFlow()
+
+    fun updatePageTitle(title: String) {
+        val cleanedTitle = title.trim()
+        if (cleanedTitle.isNotEmpty() && 
+            !cleanedTitle.lowercase().contains("about:blank") && 
+            !cleanedTitle.lowercase().contains("http") &&
+            !cleanedTitle.lowercase().contains("index-v1-a1")) {
+            _currentPageTitle.value = cleanedTitle
+        }
+    }
+
+    private fun isGenericTitle(title: String?): Boolean {
+        if (title.isNullOrBlank()) return true
+        val lower = title.lowercase()
+        return lower == "index" || 
+               lower == "master" || 
+               lower == "playlist" || 
+               lower == "index-v1-a1" || 
+               lower == "video" || 
+               lower == "videoplayback" || 
+               lower == "stream" || 
+               lower.startsWith("video_") || 
+               lower.contains("about:blank")
+    }
+
     fun updateUrl(url: String) {
-        _currentUrl.value = url
+        if (_currentUrl.value != url) {
+            _currentUrl.value = url
+            clearDetectedVideo()
+            _currentPageTitle.value = ""
+        }
     }
 
     fun setLoading(loading: Boolean) {
@@ -69,7 +100,16 @@ class BrowserViewModel(context: Context) : ViewModel() {
         
         viewModelScope.launch {
             try {
-                val videoInfo = extractUseCase.extract(url, _currentUrl.value, detectedTitle)
+                val finalTitleToUse = if (isGenericTitle(detectedTitle)) {
+                    if (_currentPageTitle.value.isNotBlank() && !isGenericTitle(_currentPageTitle.value)) {
+                        _currentPageTitle.value
+                    } else {
+                        detectedTitle ?: ""
+                    }
+                } else {
+                    detectedTitle ?: ""
+                }
+                val videoInfo = extractUseCase.extract(url, _currentUrl.value, finalTitleToUse)
                 _detectedVideo.value = videoInfo
             } catch (e: Exception) {
                 e.printStackTrace()

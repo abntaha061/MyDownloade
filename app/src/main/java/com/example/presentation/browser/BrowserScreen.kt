@@ -248,6 +248,9 @@ fun BrowserScreen(
                 onUrlChanged = { newUrl ->
                     viewModel.updateUrl(newUrl)
                 },
+                onTitleChanged = { title ->
+                    viewModel.updatePageTitle(title)
+                },
                 onVideoDetected = { detectedUrl, pageTitle ->
                     viewModel.onVideoLinkDetected(detectedUrl, pageTitle)
                 },
@@ -316,6 +319,7 @@ fun WebViewCompose(
     isAdBlockEnabled: Boolean,
     onPageProgressChanged: (WebView, Int) -> Unit,
     onUrlChanged: (String) -> Unit,
+    onTitleChanged: (String) -> Unit,
     onVideoDetected: (String, String?) -> Unit,
     onCreated: (WebView) -> Unit
 ) {
@@ -405,8 +409,10 @@ fun WebViewCompose(
                         }
 
                         if (isSniffableVideoUrl(reqUrl)) {
-                            val pageTitle = view?.title
-                            post { onVideoDetected(reqUrl, pageTitle) }
+                            post { 
+                                val pageTitle = view?.title
+                                onVideoDetected(reqUrl, pageTitle) 
+                            }
                         }
                         return super.shouldInterceptRequest(view, request)
                     }
@@ -415,6 +421,12 @@ fun WebViewCompose(
                 webChromeClient = object : WebChromeClient() {
                     override fun onProgressChanged(view: WebView, newProgress: Int) {
                         onPageProgressChanged(view, newProgress)
+                    }
+
+                    override fun onReceivedTitle(view: WebView?, title: String?) {
+                        if (!title.isNullOrBlank()) {
+                            onTitleChanged(title)
+                        }
                     }
                 }
 
@@ -451,6 +463,23 @@ fun isSniffableVideoUrl(url: String): Boolean {
         lower.contains("google-analytics") || 
         lower.contains("doubleclick")) {
         return false
+    }
+
+    // Ignore website player pages, social hosts, and iframe embed structures to let full media play first
+    if (lower.contains("/embed") || 
+        lower.contains("/iframe") || 
+        lower.contains("/player/") || 
+        lower.contains("dailymotion.com") || 
+        lower.contains("vimeo.com") || 
+        lower.contains("youtube.com") || 
+        lower.contains("youtu.be") || 
+        lower.contains("facebook.com") || 
+        lower.contains("soundmanager") || 
+        lower.contains("player.html")) {
+        // Allow ONLY if it contains an actual direct video/playlist format extension in the URL
+        if (!lower.contains(".mp4") && !lower.contains(".m3u8") && !lower.contains(".webm") && !lower.contains(".mkv")) {
+            return false
+        }
     }
 
     val cleanUrl = lower.split("?")[0]
